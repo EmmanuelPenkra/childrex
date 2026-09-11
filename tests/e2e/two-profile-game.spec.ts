@@ -111,6 +111,29 @@ test('approved desktop artboard uses the measured Canvas geometry',async({page})
   await expect(page.locator('.start')).toHaveCSS('height','68px');
 });
 
+test('the fixed Canvas artboard fits narrow browser panes without horizontal scrolling',async({page})=>{
+  await page.setViewportSize({width:285,height:800});await page.goto('/sequence/');
+  await expect(page.getByRole('heading',{name:'Pick your side'})).toBeVisible();
+  expect(await page.evaluate(()=>({scrollWidth:document.documentElement.scrollWidth,innerWidth,bodyScrollWidth:document.body.scrollWidth}))).toEqual({scrollWidth:285,innerWidth:285,bodyScrollWidth:285});
+  const stage=await page.locator('.stage').boundingBox();expect(stage?.x).toBeGreaterThanOrEqual(0);expect(stage?.width).toBeCloseTo(285,0);
+  await page.getByRole('button',{name:'Add third team'}).click();
+  await expect(page.locator('.team-panel').nth(1).locator('.color-control')).toContainText('GREEN');
+  await expect(page.getByText('0 PLAYERS')).toHaveCount(0);
+});
+
+test('the Canvas menu overlay remains fully visible in a narrow browser pane',async({page},testInfo)=>{
+  await page.setViewportSize({width:285,height:800});await page.goto('/sequence/');
+  await page.locator('.team-panel').nth(0).getByLabel('Select blue').click();
+  await page.locator('.team-panel').nth(1).getByLabel('Select red').click();
+  await page.locator('.team-panel').nth(1).getByRole('button',{name:'Add computer'}).click();
+  await page.getByRole('button',{name:/Start game/}).click();
+  await page.getByRole('button',{name:'Menu'}).click();
+  const menu=await page.getByRole('dialog',{name:'Game menu'}).boundingBox();
+  expect(menu).not.toBeNull();expect(menu!.x).toBeGreaterThanOrEqual(0);expect(menu!.x+menu!.width).toBeLessThanOrEqual(285);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBe(285);
+  await shot(page,testInfo,'narrow-menu-overlay');
+});
+
 test('three-team lobby assigns the remaining color and can create a fresh room',async({page},testInfo)=>{
   await page.setViewportSize({width:1280,height:1040});await page.goto('/sequence/');
   const original=(await page.locator('.code-badge strong').innerText()).trim();
