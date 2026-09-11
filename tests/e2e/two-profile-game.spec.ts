@@ -81,3 +81,11 @@ test('two isolated Chrome profiles complete a synchronized room journey',async({
 test('phone layout starts a game with a computer without horizontal page overflow',async({browser},testInfo)=>{
   const profile=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,recordVideo:{dir:testInfo.outputPath('phone-video'),size:{width:390,height:844}}});const page=await profile.newPage();
   try{await page.goto('/sequence/');await expect(page.getByRole('heading',{name:'Gather your teams'})).toBeVisible();await page.locator('.team-panel').nth(0).getByLabel('Select blue').click();await page.locator('.team-panel').nth(1).getByLabel('Select red').click();await page.locator('.team-panel').nth(1).getByRole('button',{name:'+ Add computer'}).click();await expect(page.getByRole('button',{name:/Start game/})).toBeEnabled();await shot(page,testInfo,'phone-lobby');await page.getByRole('button',{name:/Start game/}).click();await expect(page.locator('.board-cell')).toHaveCount(100);await expect(page.locator('.hand-card')).toHaveCount(7);expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);await shot(page,testInfo,'phone-game');await choosePlayable(page);await expect(page.locator('.board-cell.valid').first()).toBeVisible();await page.locator('.board-cell.valid').first().click();await expect(page.locator('.board-cell.last')).toHaveCount(1)}finally{await close(profile)}});
+
+test('credits route renders directly with local-asset attribution',async({page})=>{
+  await page.goto('/sequence/credits');
+  await expect(page.getByRole('heading',{name:'Made for the table.'})).toBeVisible();
+  await expect(page.getByText('Public Domain Deck')).toBeVisible();
+  await expect(page.getByText(/Avataaars was created by Pablo Stanley/)).toBeVisible();
+  await expect(page.getByRole('link',{name:'Back to game'})).toHaveAttribute('href','/sequence/');
+});
