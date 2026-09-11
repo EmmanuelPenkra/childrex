@@ -25,7 +25,10 @@ jobs:
       - run: pnpm test:e2e
   image:
     needs: verify
-    runs-on: ubuntu-24.04
+    # Build on the production architecture itself. Running Node/pnpm under
+    # x86-to-ARM QEMU is both slower and has produced illegal-instruction
+    # crashes during otherwise valid dependency installs.
+    runs-on: [self-hosted, linux, ARM64, childrex-sequence-production]
     outputs:
       digest: ${{ steps.build.outputs.digest }}
     steps:
