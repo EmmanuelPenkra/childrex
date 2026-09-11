@@ -1,6 +1,7 @@
 services:
   app:
-    image: ${SEQUENCE_IMAGE:?Set SEQUENCE_IMAGE to an immutable GHCR digest}
+    build: .
+    image: childrex-sequence:${BUILD_SHA:-local}
     container_name: childrex-sequence-app
     restart: unless-stopped
     user: "1000:1000"
