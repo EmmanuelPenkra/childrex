@@ -33,6 +33,8 @@ jobs:
           BUILD_SHA: ${{ github.sha }}
         run: docker compose -p childrex-sequence -f compose.production.yml up --build --force-recreate -d --wait --wait-timeout 180
       - name: Verify deployment
+        env:
+          BUILD_SHA: ${{ github.sha }}
         run: |
           docker compose -p childrex-sequence -f compose.production.yml ps
-          docker compose -p childrex-sequence -f compose.production.yml exec -T app wget -qO- http://127.0.0.1:3000/sequence/api/health/ready
+          docker compose -p childrex-sequence -f compose.production.yml exec -T app wget -qO- http://127.0.0.1:3000/sequence/api/health/live
