@@ -1,0 +1,1 @@
+github-actions-sequence ALL=(root) NOPASSWD: /usr/local/sbin/deploy-childrex-sequence *

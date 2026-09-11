@@ -24,15 +24,20 @@ jobs:
         with:
           context: .
           push: true
+          platforms: linux/arm64
           tags: ghcr.io/emmanuelpenkra/childrex-sequence:${{ github.sha }}
   deploy:
     needs: image
-    runs-on: [self-hosted, linux, x64, childrex-sequence-production]
+    runs-on: [self-hosted, linux, ARM64, childrex-sequence-production]
     permissions: {contents: read, packages: read}
     environment: production
     steps:
+      - uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef
+        with: {registry: ghcr.io, username: "${{ github.actor }}", password: "${{ secrets.GITHUB_TOKEN }}"}
       - name: Deploy immutable image through scoped helper
         env:
           IMAGE: ghcr.io/emmanuelpenkra/childrex-sequence@${{ needs.image.outputs.digest }}
           BUILD_SHA: ${{ github.sha }}
         run: sudo /usr/local/sbin/deploy-childrex-sequence "$IMAGE" "$BUILD_SHA"
+      - if: always()
+        run: docker logout ghcr.io || true
