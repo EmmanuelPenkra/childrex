@@ -1,0 +1,10 @@
+node_modules/
+dist/
+coverage/
+test-results/
+playwright-report/
+.env
+*.sqlite*
+.DS_Store
+/card-assets/
+/*.png

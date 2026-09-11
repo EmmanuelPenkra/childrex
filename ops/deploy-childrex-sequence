@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+IMAGE=${1:-}
+BUILD_SHA=${2:-}
+case "$IMAGE" in ghcr.io/emmanuelpenkra/childrex-sequence@sha256:*) ;; *) echo "Rejected image reference" >&2; exit 2;; esac
+[[ "$BUILD_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "Rejected build SHA" >&2; exit 2; }
+
+APP_DIR=/opt/childrex-sequence
+DATA_DIR=/srv/childrex-sequence/data
+BACKUP_DIR=/srv/childrex-sequence/backups
+RUNNER_DOCKER_CONFIG=/home/github-actions-sequence/.docker
+mkdir -p "$DATA_DIR" "$BACKUP_DIR"
+chown 1000:1000 "$DATA_DIR"
+chmod 700 "$DATA_DIR" "$BACKUP_DIR"
+
+if [[ -f "$DATA_DIR/rooms.json" ]]; then
+  cp --preserve=mode,timestamps "$DATA_DIR/rooms.json" "$BACKUP_DIR/rooms-$(date -u +%Y%m%dT%H%M%SZ).json"
+fi
+find "$BACKUP_DIR" -type f -name 'rooms-*.json' -mtime +7 -delete
+
+docker --config "$RUNNER_DOCKER_CONFIG" pull "$IMAGE"
+export SEQUENCE_IMAGE="$IMAGE" BUILD_SHA
+docker compose -p childrex-sequence -f "$APP_DIR/compose.production.yml" up -d --remove-orphans
+
+for attempt in {1..30}; do
+  status=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}starting{{end}}' childrex-sequence-app 2>/dev/null || true)
+  [[ "$status" == healthy ]] && exit 0
+  [[ "$status" == unhealthy ]] && break
+  sleep 1
+done
+docker logs --tail 100 childrex-sequence-app >&2 || true
+exit 1
