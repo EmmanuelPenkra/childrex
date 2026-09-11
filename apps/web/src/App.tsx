@@ -11,6 +11,9 @@ const COLOR_HEX:Record<TeamColor,string>={blue:'#2F6BFF',red:'#E5484D',green:'#3
 const avatar=(id:string)=>`/sequence/assets/avatars/${id}.svg`;
 const card=(face:CardFace)=>`/sequence/assets/cards/${face}.svg`;
 const cellKey=(cell:Cell)=>`${cell.row},${cell.col}`;
+const CARD_ASSETS=[...new Set(BOARD.flat().filter(face=>face!=='F'))] as CardFace[];
+let cardAssetsPromise:Promise<void>|null=null;
+function preloadCards(){return cardAssetsPromise??=Promise.all(CARD_ASSETS.map(face=>new Promise<void>((resolve,reject)=>{const image=new Image();image.onload=()=>resolve();image.onerror=()=>reject(new Error(`Card asset failed: ${face}`));image.src=card(face)}))).then(()=>undefined)}
 
 function Logo(){return <div className="brand" aria-label="Sequence">SEQUENCE</div>}
 function Spinner(){return <div className="loading"><span/><p>Setting the table…</p></div>}
@@ -57,9 +60,10 @@ function ColorPicker({team,used,disabled,fallback,count,showCount,onPick}:{team:
 }
 
 function Lobby({room,command,onJoin,onAvatar,onToast}:{room:RoomSnapshot;command:(x:Record<string,unknown>)=>Promise<void>;onJoin:()=>void;onAvatar:()=>void;onToast:(s:string)=>void}){
-  const isHost=room.isHost;const sizes=room.teams.map(t=>t.seatIds.length);const balanced=sizes.every(n=>n>0&&n===sizes[0]);const colored=room.teams.every(t=>t.color);const canStart=isHost&&balanced&&colored;
+  const [cardsReady,setCardsReady]=useState(false);useEffect(()=>{let active=true;preloadCards().then(()=>active&&setCardsReady(true)).catch(()=>active&&onToast('Cards could not load. Check your connection.'));return()=>{active=false}},[onToast]);
+  const isHost=room.isHost;const sizes=room.teams.map(t=>t.seatIds.length);const balanced=sizes.every(n=>n>0&&n===sizes[0]);const colored=room.teams.every(t=>t.color);const canStart=isHost&&balanced&&colored&&cardsReady;
   const capacity=12;const sequences=room.teams.length===3?1:2;
-  const shortest=Math.min(...sizes),longest=Math.max(...sizes),shortTeam=room.teams[sizes.indexOf(shortest)];const shortName=shortTeam.color?shortTeam.color[0].toUpperCase()+shortTeam.color.slice(1):'the empty team';const missing=Math.max(1,longest-shortest);const startHint=!isHost?'The host will start when everyone is ready':!colored?'Select a color for each team to continue':!balanced?`Add ${missing} ${missing===1?'player or computer':'players or computers'} to ${shortName}`:'';
+  const shortest=Math.min(...sizes),longest=Math.max(...sizes),shortTeam=room.teams[sizes.indexOf(shortest)];const shortName=shortTeam.color?shortTeam.color[0].toUpperCase()+shortTeam.color.slice(1):'the empty team';const missing=Math.max(1,longest-shortest);const startHint=!isHost?'The host will start when everyone is ready':!cardsReady?'Setting the table…':!colored?'Select a color for each team to continue':!balanced?`Add ${missing} ${missing===1?'player or computer':'players or computers'} to ${shortName}`:'';
   const displayTeams=room.teams.length===3?[room.teams[0],room.teams[2],room.teams[1]]:room.teams;
   return <main className="lobby-shell"><header className="lobby-top"><Logo/><button className="lobby-close" onClick={()=>location.assign('/')} aria-label="Close game"><X size={18}/></button></header>
     <section className="lobby-intro"><div><p className="eyebrow">{room.teams.length} TEAMS · {sequences===1?'FIRST SEQUENCE WINS':'TWO SEQUENCES TO WIN'}</p><h1>Pick your side</h1><p>{colored?(room.teams.length===3?'Tap a player to send them to the next team':'Tap a player to move them across'):'Choose a color for each team'} · {room.seats.length} of {capacity} joined</p></div><CodeBadge room={room} onToast={onToast}/></section>
@@ -93,8 +97,9 @@ function Hand({room,selected,onSelect,onExchange,onPass}:{room:RoomSnapshot;sele
 }
 
 function Game({room,command,onMenu,onAvatar,menuOpen}:{room:RoomSnapshot;command:(x:Record<string,unknown>)=>Promise<void>;onMenu:()=>void;onAvatar:()=>void;menuOpen:boolean}){
-  const [selected,setSelected]=useState<Selected>(null);useEffect(()=>setSelected(null),[room.round?.turn]);const current=room.round?.currentSeatId;
+  const [selected,setSelected]=useState<Selected>(null);const [cardsReady,setCardsReady]=useState(false);useEffect(()=>setSelected(null),[room.round?.turn]);useEffect(()=>{let active=true;preloadCards().then(()=>active&&setCardsReady(true));return()=>{active=false}},[]);const current=room.round?.currentSeatId;
   const play=async(cardId:string,cell:Cell)=>{setSelected(null);await command({type:'play',cardId,row:cell.row,col:cell.col})};
+  if(!cardsReady)return <Spinner/>;
   return <main className="game-shell"><header className="game-top"><Logo/><div className="player-strip">{room.round!.turnOrder.map(id=>{const seat=room.seats.find(s=>s.id===id)!;const team=room.teams.find(t=>t.id===seat.teamId)!;const member=room.members.find(m=>m.seatId===id);const made=room.round!.lastMove?.seatId===id&&room.round!.sequences.some(s=>s.createdTurn===room.round!.lastMove?.turn);const status=room.phase==='finished'?undefined:id===current?undefined:made?'Sequence made':room.round!.lastMove?.seatId===id?'Last move':undefined;return <PlayerRow key={id} seat={seat} team={team} you={member?.isYou??false} current={id===current} status={status} onAvatar={member?.isYou?onAvatar:undefined} onName={member?.isYou?name=>command({type:'profile',name,avatarId:seat.avatarId}):undefined}/>})}</div><button className="menu-btn" aria-expanded={menuOpen} aria-controls="game-menu" onClick={onMenu}><MenuIcon size={16}/>Menu</button></header><Board room={room} selected={selected} onPlay={play}/><Hand room={room} selected={selected} onSelect={setSelected} onExchange={cardId=>command({type:'exchange',cardId})} onPass={()=>command({type:'pass'})}/></main>
 }
 

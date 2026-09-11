@@ -49,6 +49,8 @@ test('two isolated Chrome profiles complete a synchronized room journey',async({
     await host.getByRole('button',{name:/Start game/}).click();
     await expect(host.locator('.board-grid')).toBeVisible();await expect(guest.locator('.board-grid')).toBeVisible();
     await expect(host.locator('.board-cell')).toHaveCount(100);await expect(host.locator('.hand-card')).toHaveCount(7);
+    expect(await host.locator('.board-cell img,.hand-card img').evaluateAll(images=>images.every(image=>(image as HTMLImageElement).complete&&(image as HTMLImageElement).naturalWidth>0))).toBe(true);
+    expect(await guest.locator('.board-cell img,.hand-card img').evaluateAll(images=>images.every(image=>(image as HTMLImageElement).complete&&(image as HTMLImageElement).naturalWidth>0))).toBe(true);
     await expect(host.getByRole('status')).toHaveCount(0);
     await expect(host.locator('.game-top')).toHaveCSS('height','88px');
     await expect(host.locator('.board-wrap')).toHaveCSS('width','998px');await expect(host.locator('.board-wrap')).toHaveCSS('height','800px');
