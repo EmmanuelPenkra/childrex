@@ -1,0 +1,52 @@
+/* The game is a fluid viewport, not a scaled artboard. */
+:root{--game-top-h:8.4615dvh;--game-hand-h:10.7692dvh}
+html.stage-active,body.stage-active,#root{width:100%;height:100%;min-height:0;overflow:hidden}
+.stage-viewport,.stage,.app{position:absolute;inset:0;width:100%;height:100%;min-width:0;min-height:0;overflow:hidden;transform:none}
+.loading,.fatal,.left-screen{width:100%;height:100%;min-height:0}
+
+.game-shell{position:absolute;inset:0;width:100%;height:100%;grid-template-rows:var(--game-top-h) minmax(0,1fr) var(--game-hand-h)}
+.game-top{position:relative;inset:0;width:100%;height:100%;grid-template-columns:14.0625% minmax(0,1fr) 14.0625%;padding:1.1538dvh 3.90625vw}
+.game-top .brand{font-size:2.1875vw}.player-strip{gap:.46875vw}
+.game-top .player{height:5.5385dvh;max-width:11.71875vw;padding:.6731dvh .859375vw;gap:.703125vw;border-radius:1.0577dvh}
+.game-top .avatar{width:3.2692dvh;height:3.2692dvh}.game-top .avatar img{width:2.8846dvh;height:2.8846dvh}
+.game-top .player-copy{max-width:7.1875vw}.game-top .player-name{font-size:1.25dvh}.game-top .player-copy small{font-size:.9615dvh}
+.menu-btn{height:3.8462dvh;padding:0 1.09375vw;border-radius:.7692dvh;font-size:1.25dvh}
+
+.board-wrap{align-self:stretch;justify-self:stretch;width:100%;height:100%;border-width:1px 0;border-radius:0;box-shadow:none}
+.board-grid{inset:5.89375% .76052%;column-gap:.22234%;row-gap:.27738%}
+.board-band{height:5.89375%;grid-template-columns:21.8637% 26.2365% 21.8637%;padding:0 7.9068%}
+.board-band .board-word{font-size:3.54625cqh}.board-band .board-rule{height:50.9%;border-radius:999px;font-size:1.15875cqh}
+.board-cell,.board-cell>img,.board-cell.valid:after,.board-cell.last:after,.board-cell.sequence-cell:after{border-radius:.2dvh}
+.chip,.removed-chip{width:42%;height:auto}.corner-mark{width:min(47cqw,65cqh);height:auto;aspect-ratio:1}
+
+.hand{width:100%;height:100%;padding:1.1538dvh 1.875vw;gap:1.875vw}.hand-row{height:100%;gap:.9375vw}
+.hand-card{height:98.943%;width:auto;aspect-ratio:62/87.07;border-radius:.3846dvh}.hand-card img{border-radius:.3846dvh}.hand-card.selected{transform:translateY(-.5769dvh)}
+.hand-action{height:3.8462dvh;padding:0 1.25vw;border-radius:1.0577dvh;font-size:1.0577dvh}
+
+.scrim,.result-scrim{width:100%;height:100%;min-width:0;min-height:0}
+.menu-popover{right:3.90625vw;top:6.9231dvh;width:21.875vw;padding:.5769dvh;border-radius:1.1538dvh;gap:.1923dvh}
+.menu-popover .menu-row{height:3.8462dvh;padding:0 .78125vw;border-radius:.7692dvh;font-size:1.3462dvh}.menu-popover .menu-row>svg{flex-basis:1.5385dvh;width:1.5385dvh;height:1.5385dvh}
+
+.sequence-reveal{inset:var(--game-top-h) 0 var(--game-hand-h);width:100%;height:auto}.sequence-reveal svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.sequence-reveal .winning-edge{stroke:var(--highlight);stroke-width:69;stroke-linecap:round}.sequence-reveal .winning-band{stroke:color-mix(in srgb,var(--highlight),transparent 76%);stroke-width:63;stroke-linecap:round}
+.sequence-reveal circle{fill:var(--winner);stroke:#fff;stroke-width:2.5;animation:sequence-chip .24s cubic-bezier(.2,.8,.2,1) both}
+.sequence-tag{left:22.044%;top:19.25%;height:3.25%;padding:0 1.2024%;border-radius:999px;font-size:1.375cqh}
+.result-bar{height:var(--game-hand-h)}.result-content{left:4.0625%;top:.3846dvh;width:91.875%;height:calc(100% - .3846dvh)}
+.result-copy{gap:1.40625vw}.result-copy h1{font-size:4.0385dvh}.result-actions{gap:1.71875vw}.result-score{font-size:2.4038dvh}.result-score i{width:1.5385dvh;height:1.5385dvh}
+.new-game-btn,.replay-btn{height:4.6154dvh;padding:0 1.5625vw;border-radius:1.1538dvh;font-size:1.3462dvh}
+
+.lobby-shell{width:100%;height:100%;min-height:0}.lobby-shell:before,.join-screen:before{height:.5769dvh}
+.lobby-top{inset:.5769dvh 0 auto;height:8.4615dvh;padding:0 7.8125vw}.lobby-intro{top:11.1538dvh;width:84.375%;height:11.7308dvh}
+.lobby-intro h1{font-size:5.3846dvh}.lobby-intro p:last-child{margin-top:1.1538dvh;font-size:1.5385dvh}
+.code-badge{width:min(9.375vw,11.5385dvh);height:auto;aspect-ratio:1;border-width:.3846dvh}.code-badge small{font-size:1.0577dvh}.code-badge strong{font-size:5.3846dvh}
+.teams{top:26.9231dvh;width:84.375%;height:48.0769dvh;grid-template-columns:repeat(2,minmax(0,1fr));gap:1.875vw}.teams-3{grid-template-columns:repeat(3,minmax(0,1fr));gap:2.34375vw}
+.team-panel{height:100%;padding:2.6923dvh 2.1875vw;border-radius:2.6923dvh;gap:1.3462dvh}.color-control{flex-basis:5.6731dvh;padding:.2885dvh 0 1.3462dvh;font-size:2.8846dvh}
+.teams-3 .selected-team .color-control{font-size:4.2308dvh}.color-swatch{width:2.6923dvh;height:2.6923dvh;margin-right:.546875vw}
+.team-players{flex:1 1 auto;min-height:0;gap:min(1.3462dvh,calc(3.8462dvh / var(--max-seats)))}
+.team-players .player{flex:1 1 0;height:auto;min-height:0;max-height:6.9231dvh;padding:0 1.40625vw 0 1.09375vw;border-radius:1.7308dvh;gap:1.09375vw}
+.team-players .avatar{width:min(3.59375vw,4.4231dvh);height:auto;aspect-ratio:1}.team-players .avatar img{width:91.3%;height:91.3%}
+.team-players .player-name{font-size:min(1.40625vw,1.7308dvh)}.team-players .player-copy small{font-size:min(.9375vw,1.1538dvh)}
+.subtle-btn{flex-basis:6.9231dvh;height:6.9231dvh;border-radius:1.7308dvh;font-size:1.4423dvh}
+.add-team{top:24.0385dvh;width:8.0769dvh;height:8.0769dvh;border-width:.3846dvh}.add-team:before{inset:-1.9231dvh}
+.lobby-footer{top:auto;bottom:7.6923dvh;width:84.375%;height:9.2308dvh}.join-another,.start{height:6.5385dvh;border-radius:1.7308dvh;font-size:1.7308dvh}
+.join-another{width:25.546875vw}.start-wrap,.start{width:21.875vw}

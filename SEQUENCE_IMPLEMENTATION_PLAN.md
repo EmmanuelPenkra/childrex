@@ -57,7 +57,7 @@ Do not use a screenshot as the functioning UI. Do not infer working interactions
 | Area | Default for version 1 |
 | --- | --- |
 | Identity | Guest profiles; no login, email, password, or account registration |
-| Repository | Private `EmmanuelPenkra/childrex-sequence`; check availability before creating |
+| Repository | Private `EmmanuelPenkra/childrex`; the repository owns the whole site and Sequence is the `/sequence` route |
 | Room access | Invite link or the approved two-digit code; no public room directory |
 | Team sizes | Equal sizes required at start; computers count as players |
 | Human turn timer | None while connected |
@@ -700,7 +700,7 @@ Recommended concrete stack: TypeScript throughout; React + Vite frontend; Fastif
 Do not introduce Kubernetes, Redis, multiple game servers, or a separate database service for version 1. One application process owns all room actors. SQLite resides on a durable local volume, not a network filesystem. Enable WAL and foreign keys; use a busy timeout. See [SQLite WAL documentation](https://www.sqlite.org/wal.html).
 
 ```text
-childrex-sequence/
+childrex/
   apps/web/src/
     app/                 routes, guest bootstrap, room shell
     components/          Board, Cell, Chip, Hand, Card, PlayerCard
@@ -928,14 +928,14 @@ SSH currently resolves to root; do not make the application or new runner root m
 
 ### 18.2 Isolation and names
 
-- Repository proposed: `EmmanuelPenkra/childrex-sequence`, private.
+- Repository: `EmmanuelPenkra/childrex`, private; `/sequence` is one route within the site.
 - Runtime Compose project: `childrex-sequence`.
 - Service/container: `childrex-sequence-app`.
 - App config/releases: `/opt/childrex-sequence/`.
 - Durable database: `/srv/childrex-sequence/data/`.
 - Backups: `/srv/childrex-sequence/backups/` with restrictive access.
-- Runner: separate service/user and directory, e.g. `/opt/actions-runner-childrex-sequence`; repository-specific label `childrex-sequence-production`.
-- Do not re-register, stop, change labels on, or borrow the Schoolbase runner.
+- Runner: use the already configured personal self-hosted runner; do not install or register another runner.
+- Do not re-register, stop, or change labels on the existing runner.
 - App runs as non-root container user, no Docker socket, no host network, no public database port. Attach app to existing proxy network. Bind internal app port 3000, not a second host 80/443 listener.
 - Initial runtime limit 512 MiB and 0.75 CPU, verify under load; separate runner work/build capacity. No global Docker prune or broad service restart.
 
@@ -945,7 +945,7 @@ Use shared proxy's existing hostname/certificate conventions after inspecting th
 
 `verify.yml`: pull requests and pushes; GitHub-hosted runner. Frozen lockfile install; lint; typecheck; engine/server tests; production build; Playwright; asset/notice checks. Untrusted PR code never runs on the production self-hosted runner.
 
-`release.yml`: successful verified protected-main push, plus explicit workflow_dispatch rollback/deploy. Build immutable Docker image on a GitHub-hosted runner; tag with commit SHA and push to private GHCR. Deploy job uses the dedicated self-hosted runner with minimum permissions, serial concurrency group `childrex-sequence-production`, `cancel-in-progress: false` for deploy steps.
+`release.yml`: successful verified protected-main push, plus explicit workflow_dispatch rollback/deploy. Verification runs on GitHub-hosted infrastructure; deployment uses the already configured personal self-hosted runner, serial concurrency group `childrex-sequence-production`, and `cancel-in-progress: false` for deploy steps.
 
 Pin Actions by full commit SHA. Do not use `pull_request_target` to check out/run untrusted code. Set contents read-only by default; grant package write only to image-publish job. Keep runtime secrets outside repo and out of frontend build variables. Self-hosted runners require particular care with trusted code and secrets: [GitHub secure-use guidance](https://docs.github.com/en/actions/reference/security/secure-use).
 

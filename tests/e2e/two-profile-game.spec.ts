@@ -54,9 +54,11 @@ test('two isolated Chrome profiles complete a synchronized room journey',async({
     expect(await host.locator('.board-cell img,.hand-card img').evaluateAll(images=>images.every(image=>(image as HTMLImageElement).complete&&(image as HTMLImageElement).naturalWidth>0))).toBe(true);
     expect(await guest.locator('.board-cell img,.hand-card img').evaluateAll(images=>images.every(image=>(image as HTMLImageElement).complete&&(image as HTMLImageElement).naturalWidth>0))).toBe(true);
     await expect(host.getByRole('status')).toHaveCount(0);
-    await expect(host.locator('.game-top')).toHaveCSS('height','88px');
-    await expect(host.locator('.board-wrap')).toHaveCSS('width','998px');await expect(host.locator('.board-wrap')).toHaveCSS('height','800px');
-    await expect(host.locator('.hand')).toHaveCSS('height','112px');
+    const top=await host.locator('.game-top').boundingBox(),board=await host.locator('.board-wrap').boundingBox(),hand=await host.locator('.hand').boundingBox();
+    expect(top).not.toBeNull();expect(board).not.toBeNull();expect(hand).not.toBeNull();
+    expect(top!.x).toBe(0);expect(top!.y).toBe(0);expect(top!.width).toBe(1280);
+    expect(board!.x).toBe(0);expect(board!.width).toBe(1280);expect(board!.y).toBeCloseTo(top!.height,0);expect(board!.y+board!.height).toBeCloseTo(hand!.y,0);
+    expect(hand!.x).toBe(0);expect(hand!.width).toBe(1280);expect(hand!.y+hand!.height).toBeCloseTo(1040,0);
     await shot(host,testInfo,'04-host-game-rest');await shot(guest,testInfo,'05-guest-game-rest');
 
     const hostIsCurrent=(await host.locator('.player.current .player-name').innerText())==='You';
@@ -65,7 +67,7 @@ test('two isolated Chrome profiles complete a synchronized room journey',async({
     await expect(mover.locator('.hand-card.selected')).toHaveCount(1);
     await expect(mover.locator('.board-cell.valid').first()).toBeVisible();
     expect(await mover.locator('.board-cell.valid').first().evaluate(element=>{const style=getComputedStyle(element,'::after');return{radius:style.borderRadius,width:style.borderTopWidth}})).toEqual({radius:'2.08px',width:'1px'});
-    await expect(mover.locator('.hand-card.selected')).toHaveCSS('transform','matrix(1, 0, 0, 1, 0, -6)');
+    await expect.poll(()=>mover.locator('.hand-card.selected').evaluate(element=>new DOMMatrixReadOnly(getComputedStyle(element).transform).m42)).toBeLessThan(0);
     await shot(mover,testInfo,'06-selected-valid-moves');
     await mover.locator('.board-cell.valid').first().click();
     await expect(mover.locator('.board-cell.last')).toHaveCount(1);await expect(observer.locator('.board-cell.last')).toHaveCount(1);
@@ -90,8 +92,8 @@ test('two isolated Chrome profiles complete a synchronized room journey',async({
 
     await host.evaluate(async id=>{await fetch('/sequence/api/test/fixture',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({roomId:id,kind:'win'})})},roomId);
     await expect(host.getByText(/GAME OVER · .* WINS/)).toBeVisible();await expect(guest.getByText(/GAME OVER · .* WINS/)).toBeVisible();
-    await expect(host.locator('.sequence-reveal>i')).toHaveCount(9);await expect(guest.locator('.sequence-reveal>i')).toHaveCount(9);
-    await host.waitForTimeout(300);const resultBar=await host.locator('.result-bar').boundingBox();expect(resultBar).not.toBeNull();expect(resultBar!.y).toBe(928);expect(resultBar!.height).toBe(112);
+    await expect(host.locator('.sequence-reveal>svg>circle')).toHaveCount(9);await expect(guest.locator('.sequence-reveal>svg>circle')).toHaveCount(9);
+    await host.waitForTimeout(300);const resultBar=await host.locator('.result-bar').boundingBox();expect(resultBar).not.toBeNull();expect(resultBar!.y+resultBar!.height).toBeCloseTo(1040,0);
     await shot(host,testInfo,'11-winner-overlay');await shot(guest,testInfo,'12-result-other-profile');
     await guest.getByRole('button',{name:/Replay/}).click();
     await expect(host.getByText(/GAME OVER · .* WINS/)).toBeHidden();await expect(guest.getByText(/GAME OVER · .* WINS/)).toBeHidden();
@@ -103,15 +105,11 @@ test('two isolated Chrome profiles complete a synchronized room journey',async({
   }finally{await close(hostProfile);await close(guestProfile)}
 });
 
-test('approved desktop artboard uses the measured Canvas geometry',async({page})=>{
+test('lobby fills the viewport while retaining the approved proportions',async({page})=>{
   await page.setViewportSize({width:1280,height:1040});
   await page.goto('/sequence/');
-  await expect(page.locator('.lobby-top')).toHaveCSS('height','88px');
-  await expect(page.locator('.lobby-intro')).toHaveCSS('width','1080px');
-  await expect(page.locator('.teams')).toHaveCSS('width','1080px');
-  await expect(page.locator('.team-panel').first()).toHaveCSS('height','500px');
-  await expect(page.locator('.code-badge')).toHaveCSS('width','120px');
-  await expect(page.locator('.start')).toHaveCSS('height','68px');
+  const stage=await page.locator('.stage').boundingBox();expect(stage).toEqual({x:0,y:0,width:1280,height:1040});
+  expect(await page.evaluate(()=>({width:document.documentElement.scrollWidth,height:document.documentElement.scrollHeight,innerWidth,innerHeight}))).toEqual({width:1280,height:1040,innerWidth:1280,innerHeight:1040});
   await expect(page.getByText('Select a color for each team to continue')).toHaveCount(0);
   await page.locator('.team-panel').nth(0).getByLabel('Select blue').click();await expect(page.locator('.team-panel').nth(0)).toHaveCSS('box-shadow','none');
 });
@@ -133,12 +131,12 @@ test('one human move receives exactly one computer reply after a visible pause',
   await page.waitForTimeout(1_200);expect((await round()).turn).toBe(replied.turn);
 });
 
-test('growing rosters expand their team cards and push the footer below them',async({page},testInfo)=>{
+test('growing rosters reflow inside the viewport without overflow',async({page},testInfo)=>{
   await page.setViewportSize({width:1280,height:1040});await page.goto('/sequence/');
   const red=page.locator('.team-panel').nth(1);for(let index=0;index<4;index++)await red.getByRole('button',{name:'Add computer'}).click();
   const panel=await red.boundingBox();const invite=await red.getByRole('button',{name:'Invite a friend'}).boundingBox();const footer=await page.locator('.lobby-footer').boundingBox();
   expect(panel).not.toBeNull();expect(invite).not.toBeNull();expect(footer).not.toBeNull();
-  expect(panel!.height).toBeGreaterThan(500);expect(invite!.y+invite!.height).toBeLessThanOrEqual(panel!.y+panel!.height);expect(footer!.y).toBeGreaterThan(panel!.y+panel!.height);
+  expect(invite!.y+invite!.height).toBeLessThanOrEqual(panel!.y+panel!.height);expect(footer!.y).toBeGreaterThanOrEqual(panel!.y+panel!.height);
   expect(await page.evaluate(()=>({width:document.documentElement.scrollWidth,height:document.documentElement.scrollHeight,innerWidth,innerHeight}))).toEqual({width:1280,height:1040,innerWidth:1280,innerHeight:1040});
   await shot(page,testInfo,'expanded-roster');
 });
@@ -155,7 +153,7 @@ test('team headers omit player counts and only an empty team owns the remove act
   await expect(page.locator('.team-panel').nth(2).getByRole('button',{name:'Remove team'})).toHaveCount(0);
 });
 
-test('the fixed Canvas artboard fits narrow browser panes without scrolling',async({page})=>{
+test('the fluid viewport fits narrow browser panes without scrolling',async({page})=>{
   await page.setViewportSize({width:285,height:800});await page.goto('/sequence/');
   await expect(page.getByRole('heading',{name:'Pick your side'})).toBeVisible();
   expect(await page.evaluate(()=>({scrollWidth:document.documentElement.scrollWidth,scrollHeight:document.documentElement.scrollHeight,innerWidth,innerHeight,bodyScrollWidth:document.body.scrollWidth}))).toEqual({scrollWidth:285,scrollHeight:800,innerWidth:285,innerHeight:800,bodyScrollWidth:285});
@@ -165,10 +163,23 @@ test('the fixed Canvas artboard fits narrow browser panes without scrolling',asy
   await expect(page.getByText('0 PLAYERS')).toHaveCount(0);
 });
 
-test('a short wide viewport scales the whole game to the available height without scrolling',async({page})=>{
+test('a short wide viewport uses the available height without scrolling',async({page})=>{
   await page.setViewportSize({width:1280,height:700});await page.goto('/sequence/');await expect(page.getByRole('heading',{name:'Pick your side'})).toBeVisible();
   const stage=await page.locator('.stage').boundingBox();expect(stage).not.toBeNull();expect(stage!.y).toBeCloseTo(0,0);expect(stage!.height).toBeCloseTo(700,0);expect(stage!.width).toBeLessThanOrEqual(1280);
   expect(await page.evaluate(()=>({scrollWidth:document.documentElement.scrollWidth,scrollHeight:document.documentElement.scrollHeight,innerWidth,innerHeight}))).toEqual({scrollWidth:1280,scrollHeight:700,innerWidth:1280,innerHeight:700});
+});
+
+test('wide-monitor game fills every edge and the board consumes the space between both bars',async({page},testInfo)=>{
+  await page.setViewportSize({width:1663,height:1186});await page.goto('/sequence/');
+  await page.locator('.team-panel').nth(0).getByLabel('Select blue').click();await page.locator('.team-panel').nth(1).getByLabel('Select red').click();
+  await page.locator('.team-panel').nth(1).getByRole('button',{name:'Add computer'}).click();await page.getByRole('button',{name:/Start game/}).click();
+  const top=await page.locator('.game-top').boundingBox(),board=await page.locator('.board-wrap').boundingBox(),hand=await page.locator('.hand').boundingBox();
+  expect(top).not.toBeNull();expect(board).not.toBeNull();expect(hand).not.toBeNull();
+  expect(top!.x).toBe(0);expect(top!.y).toBe(0);expect(top!.width).toBe(1663);
+  expect(board!.x).toBe(0);expect(board!.width).toBe(1663);expect(board!.y).toBeCloseTo(top!.height,0);expect(board!.y+board!.height).toBeCloseTo(hand!.y,0);
+  expect(hand!.x).toBe(0);expect(hand!.width).toBe(1663);expect(hand!.y+hand!.height).toBeCloseTo(1186,0);
+  expect(await page.evaluate(()=>({width:document.documentElement.scrollWidth,height:document.documentElement.scrollHeight,innerWidth,innerHeight}))).toEqual({width:1663,height:1186,innerWidth:1663,innerHeight:1186});
+  await shot(page,testInfo,'wide-monitor-fluid-game');
 });
 
 test('the Canvas menu overlay remains fully visible in a narrow browser pane',async({page},testInfo)=>{
@@ -182,6 +193,15 @@ test('the Canvas menu overlay remains fully visible in a narrow browser pane',as
   expect(menu).not.toBeNull();expect(menu!.x).toBeGreaterThanOrEqual(0);expect(menu!.x+menu!.width).toBeLessThanOrEqual(285);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBe(285);
   await shot(page,testInfo,'narrow-menu-overlay');
+});
+
+test('the game menu enters fullscreen and Escape restores the browser view',async({page})=>{
+  await page.setViewportSize({width:1280,height:1040});await page.goto('/sequence/');
+  await page.locator('.team-panel').nth(0).getByLabel('Select blue').click();await page.locator('.team-panel').nth(1).getByLabel('Select red').click();
+  await page.locator('.team-panel').nth(1).getByRole('button',{name:'Add computer'}).click();await page.getByRole('button',{name:/Start game/}).click();
+  await page.getByRole('button',{name:'Menu'}).click();await page.getByRole('button',{name:'Fullscreen'}).click();
+  await expect.poll(()=>page.evaluate(()=>Boolean(document.fullscreenElement))).toBe(true);
+  await page.keyboard.press('Escape');await expect.poll(()=>page.evaluate(()=>Boolean(document.fullscreenElement))).toBe(false);
 });
 
 test('three-team lobby assigns the remaining color and preserves its configuration for a new game',async({page},testInfo)=>{
@@ -199,7 +219,7 @@ test('three-team lobby assigns the remaining color and preserves its configurati
   await page.getByRole('button',{name:/Start game/}).click();await expect(page.locator('.board-grid')).toBeVisible();await expect(page.locator('.hand-card')).toHaveCount(5);
   const roomId=await page.evaluate(async()=>{const session=await fetch('/sequence/api/session',{method:'POST',headers:{'content-type':'application/json'},body:'{}'}).then(response=>response.json());return session.room.id});
   await page.evaluate(async id=>{await fetch('/sequence/api/test/fixture',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({roomId:id,kind:'win'})})},roomId);
-  await expect(page.locator('.sequence-reveal>i')).toHaveCount(5);await expect(page.locator('.result-score-three')).toBeVisible();await expect(page.locator('.sequence-tag')).toContainText('BLUE · ONE SEQUENCE');await expect(page.locator('body>canvas')).toHaveCount(1);await page.screenshot({path:testInfo.outputPath('three-team-confetti-motion.png'),animations:'allow'});await shot(page,testInfo,'three-team-winner-overlay');
+  await expect(page.locator('.sequence-reveal>svg>circle')).toHaveCount(5);await expect(page.locator('.result-score-three')).toBeVisible();await expect(page.locator('.sequence-tag')).toContainText('BLUE · ONE SEQUENCE');await expect(page.locator('body>canvas')).toHaveCount(1);await page.screenshot({path:testInfo.outputPath('three-team-confetti-motion.png'),animations:'allow'});await shot(page,testInfo,'three-team-winner-overlay');
   await page.getByRole('button',{name:'New game'}).click();
   const confirm=page.getByRole('alertdialog');await expect(confirm.getByRole('heading',{name:'Start a new game?'})).toBeVisible();await confirm.getByRole('button',{name:'New game'}).click();
   await expect(page.getByRole('heading',{name:'Pick your side'})).toBeVisible();await expect(page.locator('.code-badge strong')).not.toHaveText(original);
@@ -220,7 +240,7 @@ test('a complete human-versus-computer game preserves every chip except explicit
     await page.waitForTimeout(500);const paused=await state();expect(paused.round.turn).toBe(afterHuman.round.turn);
     await expect.poll(async()=>{const next=await state();return next.phase==='finished'||next.round.currentSeatId===next.yourSeatId},{timeout:2_500}).toBe(true);const afterComputer=await state();assertTransition(afterHuman,afterComputer);expect(await page.locator('.chip').count()).toBe(count(afterComputer.round.chips));if(afterComputer.round.lastMove?.kind==='remove'){removals++;expect(afterComputer.round.lastMove.removedTeamId).toBeTruthy();await expect(page.locator('.board-cell.removed')).toHaveCount(1)}if(cycle===0)await shot(page,testInfo,'full-game-computer-first-reply');if(afterComputer.phase==='finished')break;
   }
-  const finished=await state();expect(finished.phase).toBe('finished');await expect(page.locator('.result-bar')).toBeVisible();await expect(page.locator('.result-bar')).toHaveCSS('height','112px');expect(await page.locator('.result-bar').evaluate(element=>getComputedStyle(element).animationName)).toBe('result-in');await shot(page,testInfo,`full-game-finished-${removals}-removals`);
+  const finished=await state();expect(finished.phase).toBe('finished');await expect(page.locator('.result-bar')).toBeVisible();const result=await page.locator('.result-bar').boundingBox();expect(result).not.toBeNull();expect(result!.y+result!.height).toBeCloseTo(1040,0);expect(await page.locator('.result-bar').evaluate(element=>getComputedStyle(element).animationName)).toBe('result-in');await shot(page,testInfo,`full-game-finished-${removals}-removals`);
 });
 
 test('credits route renders directly with local-asset attribution',async({page})=>{
