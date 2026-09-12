@@ -1,5 +1,5 @@
 /* The game is a fluid viewport, not a scaled artboard. */
-:root{--game-top-h:8.4615dvh;--game-hand-h:10.7692dvh}
+:root{--game-top-h:8.4615dvh;--game-hand-h:10.7692dvh;--board-y-gap:1.9231dvh}
 html.stage-active,body.stage-active,#root{width:100%;height:100%;min-height:0;overflow:hidden}
 .stage-viewport,.stage,.app{position:absolute;inset:0;width:100%;height:100%;min-width:0;min-height:0;overflow:hidden;transform:none}
 .loading,.fatal,.left-screen{width:100%;height:100%;min-height:0}
@@ -12,7 +12,7 @@ html.stage-active,body.stage-active,#root{width:100%;height:100%;min-height:0;ov
 .game-top .player-copy{max-width:7.1875vw}.game-top .player-name{font-size:1.25dvh}.game-top .player-copy small{font-size:.9615dvh}
 .menu-btn{height:3.8462dvh;padding:0 1.09375vw;border-radius:.7692dvh;font-size:1.25dvh}
 
-.board-wrap{align-self:stretch;justify-self:stretch;width:100%;height:100%;border-width:1px 0;border-radius:0;box-shadow:none}
+.board-wrap{align-self:center;justify-self:center;width:min(100%,calc((100dvh - var(--game-top-h) - var(--game-hand-h) - 2 * var(--board-y-gap)) * 1.2475));height:auto;aspect-ratio:998/800;border-radius:.2885dvh;box-shadow:0 1.3462dvh 2.8846dvh -.5769dvh #0006}
 .board-grid{inset:5.89375% .76052%;column-gap:.22234%;row-gap:.27738%}
 .board-band{height:5.89375%;grid-template-columns:21.8637% 26.2365% 21.8637%;padding:0 7.9068%}
 .board-band .board-word{font-size:3.54625cqh}.board-band .board-rule{height:50.9%;border-radius:999px;font-size:1.15875cqh}
@@ -27,7 +27,7 @@ html.stage-active,body.stage-active,#root{width:100%;height:100%;min-height:0;ov
 .menu-popover{right:3.90625vw;top:6.9231dvh;width:21.875vw;padding:.5769dvh;border-radius:1.1538dvh;gap:.1923dvh}
 .menu-popover .menu-row{height:3.8462dvh;padding:0 .78125vw;border-radius:.7692dvh;font-size:1.3462dvh}.menu-popover .menu-row>svg{flex-basis:1.5385dvh;width:1.5385dvh;height:1.5385dvh}
 
-.sequence-reveal{inset:var(--game-top-h) 0 var(--game-hand-h);width:100%;height:auto}.sequence-reveal svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.sequence-reveal{inset:calc(var(--game-top-h) + var(--board-y-gap)) auto calc(var(--game-hand-h) + var(--board-y-gap)) 50%;width:min(100%,calc((100dvh - var(--game-top-h) - var(--game-hand-h) - 2 * var(--board-y-gap)) * 1.2475));height:auto;transform:translateX(-50%)}.sequence-reveal svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
 .sequence-reveal .winning-edge{stroke:var(--highlight);stroke-width:69;stroke-linecap:round}.sequence-reveal .winning-band{stroke:color-mix(in srgb,var(--highlight),transparent 76%);stroke-width:63;stroke-linecap:round}
 .sequence-reveal circle{fill:var(--winner);stroke:#fff;stroke-width:2.5;animation:sequence-chip .24s cubic-bezier(.2,.8,.2,1) both}
 .sequence-tag{left:22.044%;top:19.25%;height:3.25%;padding:0 1.2024%;border-radius:999px;font-size:1.375cqh}

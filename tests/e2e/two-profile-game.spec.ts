@@ -57,7 +57,7 @@ test('two isolated Chrome profiles complete a synchronized room journey',async({
     const top=await host.locator('.game-top').boundingBox(),board=await host.locator('.board-wrap').boundingBox(),hand=await host.locator('.hand').boundingBox();
     expect(top).not.toBeNull();expect(board).not.toBeNull();expect(hand).not.toBeNull();
     expect(top!.x).toBe(0);expect(top!.y).toBe(0);expect(top!.width).toBe(1280);
-    expect(board!.x).toBe(0);expect(board!.width).toBe(1280);expect(board!.y).toBeCloseTo(top!.height,0);expect(board!.y+board!.height).toBeCloseTo(hand!.y,0);
+    expect(board!.x).toBeGreaterThan(0);expect(board!.width/board!.height).toBeCloseTo(998/800,2);expect(board!.y).toBeGreaterThan(top!.height);expect(board!.y+board!.height).toBeLessThan(hand!.y);expect(board!.y-top!.height).toBeCloseTo(hand!.y-board!.y-board!.height,0);
     expect(hand!.x).toBe(0);expect(hand!.width).toBe(1280);expect(hand!.y+hand!.height).toBeCloseTo(1040,0);
     await shot(host,testInfo,'04-host-game-rest');await shot(guest,testInfo,'05-guest-game-rest');
 
@@ -169,14 +169,14 @@ test('a short wide viewport uses the available height without scrolling',async({
   expect(await page.evaluate(()=>({scrollWidth:document.documentElement.scrollWidth,scrollHeight:document.documentElement.scrollHeight,innerWidth,innerHeight}))).toEqual({scrollWidth:1280,scrollHeight:700,innerWidth:1280,innerHeight:700});
 });
 
-test('wide-monitor game fills every edge and the board consumes the space between both bars',async({page},testInfo)=>{
+test('wide-monitor shell fills every edge while the board retains its aspect ratio and breathing room',async({page},testInfo)=>{
   await page.setViewportSize({width:1663,height:1186});await page.goto('/sequence/');
   await page.locator('.team-panel').nth(0).getByLabel('Select blue').click();await page.locator('.team-panel').nth(1).getByLabel('Select red').click();
   await page.locator('.team-panel').nth(1).getByRole('button',{name:'Add computer'}).click();await page.getByRole('button',{name:/Start game/}).click();
   const top=await page.locator('.game-top').boundingBox(),board=await page.locator('.board-wrap').boundingBox(),hand=await page.locator('.hand').boundingBox();
   expect(top).not.toBeNull();expect(board).not.toBeNull();expect(hand).not.toBeNull();
   expect(top!.x).toBe(0);expect(top!.y).toBe(0);expect(top!.width).toBe(1663);
-  expect(board!.x).toBe(0);expect(board!.width).toBe(1663);expect(board!.y).toBeCloseTo(top!.height,0);expect(board!.y+board!.height).toBeCloseTo(hand!.y,0);
+  expect(board!.x).toBeGreaterThan(0);expect(board!.width/board!.height).toBeCloseTo(998/800,2);expect(board!.x).toBeCloseTo((1663-board!.width)/2,0);expect(board!.y).toBeGreaterThan(top!.height);expect(board!.y+board!.height).toBeLessThan(hand!.y);expect(board!.y-top!.height).toBeCloseTo(hand!.y-board!.y-board!.height,0);
   expect(hand!.x).toBe(0);expect(hand!.width).toBe(1663);expect(hand!.y+hand!.height).toBeCloseTo(1186,0);
   expect(await page.evaluate(()=>({width:document.documentElement.scrollWidth,height:document.documentElement.scrollHeight,innerWidth,innerHeight}))).toEqual({width:1663,height:1186,innerWidth:1663,innerHeight:1186});
   await shot(page,testInfo,'wide-monitor-fluid-game');
