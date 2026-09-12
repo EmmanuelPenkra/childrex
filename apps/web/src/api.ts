@@ -10,8 +10,8 @@ export const api={
   create:(name:string,avatarId:string)=>post<RoomSnapshot>('/sequence/api/rooms',{name,avatarId}),
   createNew:(name:string,avatarId:string)=>post<RoomSnapshot>('/sequence/api/rooms/new',{name,avatarId}),
   leave:(roomId:string)=>post<{ok:true}>('/sequence/api/rooms/leave',{roomId}),
-  lookup:(code:string,roomId?:string)=>post<RoomLookup>('/sequence/api/rooms/lookup',{code,roomId}),
-  join:(code:string,name:string,avatarId:string,roomId?:string)=>post<RoomSnapshot>('/sequence/api/rooms/join',{code,name,avatarId,roomId}),
+  lookup:(code:string)=>post<RoomLookup>('/sequence/api/rooms/lookup',{code}),
+  join:(code:string,name:string,avatarId:string)=>post<RoomSnapshot>('/sequence/api/rooms/join',{code,name,avatarId}),
   command:(roomId:string,command:Command)=>post<RoomSnapshot>('/sequence/api/commands',{roomId,commandId:crypto.randomUUID(),...command}),
 };
 export const connect=(onSnapshot:(room:RoomSnapshot)=>void)=>{

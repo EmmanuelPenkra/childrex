@@ -21,8 +21,8 @@ test('two isolated Chrome profiles complete a synchronized room journey',async({
     await expect(host.locator('.code-badge small')).toHaveText('CODE');
     const code=(await host.locator('.code-badge strong').innerText()).trim();expect(code).toMatch(/^\d{2}$/);
     await shot(host,testInfo,'01-host-neutral-lobby');
-    await host.locator('.code-badge').click();await expect(host.getByRole('status')).toHaveText('Invite copied');
-    expect(await host.evaluate(()=>navigator.clipboard.readText())).toMatch(new RegExp(`/sequence/join\\?code=${code}&room=[0-9a-f-]+$`));
+    await host.locator('.code-badge').click();await expect(host.locator('[data-sonner-toast]')).toContainText('Invite copied');await shot(host,testInfo,'01b-invite-toast');
+    expect(await host.evaluate(()=>navigator.clipboard.readText())).toMatch(new RegExp(`/sequence/join\\?code=${code}$`));
 
     await host.locator('.team-panel').nth(0).getByLabel('Select blue').click();
     await host.locator('.team-panel').nth(1).getByLabel('Select red').click();
@@ -109,6 +109,45 @@ test('approved desktop artboard uses the measured Canvas geometry',async({page})
   await expect(page.locator('.team-panel').first()).toHaveCSS('height','500px');
   await expect(page.locator('.code-badge')).toHaveCSS('width','120px');
   await expect(page.locator('.start')).toHaveCSS('height','68px');
+});
+
+test('one human move receives exactly one computer reply after a visible pause',async({page})=>{
+  await page.setViewportSize({width:1280,height:1040});await page.goto('/sequence/');
+  await page.locator('.team-panel').nth(0).getByLabel('Select blue').click();
+  await page.locator('.team-panel').nth(1).getByLabel('Select red').click();
+  await page.locator('.team-panel').nth(1).getByRole('button',{name:'Add computer'}).click();
+  await page.getByRole('button',{name:/Start game/}).click();
+  await expect(page.locator('.player.current')).toContainText('You',{timeout:4_000});
+  const round=()=>page.evaluate(async()=>{const session=await fetch('/sequence/api/session',{method:'POST',headers:{'content-type':'application/json'},body:'{}'}).then(response=>response.json());return{turn:session.room.round.turn,current:session.room.round.currentSeatId,you:session.room.yourSeatId,last:session.room.round.lastMove}});
+  const before=await round();await choosePlayable(page);await page.locator('.board-cell.valid').first().click();
+  await expect.poll(async()=>(await round()).turn).toBe(before.turn+1);
+  const committed=await round();expect(committed.current).not.toBe(committed.you);
+  await page.waitForTimeout(500);expect((await round()).turn).toBe(committed.turn);
+  await expect.poll(async()=>(await round()).turn,{timeout:2_500}).toBe(committed.turn+1);
+  const replied=await round();expect(replied.current).toBe(replied.you);expect(replied.last?.seatId).not.toBe(replied.you);
+  await page.waitForTimeout(1_200);expect((await round()).turn).toBe(replied.turn);
+});
+
+test('growing rosters expand their team cards and push the footer below them',async({page},testInfo)=>{
+  await page.setViewportSize({width:1280,height:1040});await page.goto('/sequence/');
+  const red=page.locator('.team-panel').nth(1);for(let index=0;index<4;index++)await red.getByRole('button',{name:'Add computer'}).click();
+  const panel=await red.boundingBox();const invite=await red.getByRole('button',{name:'Invite a friend'}).boundingBox();const footer=await page.locator('.lobby-footer').boundingBox();
+  expect(panel).not.toBeNull();expect(invite).not.toBeNull();expect(footer).not.toBeNull();
+  expect(panel!.height).toBeGreaterThan(500);expect(invite!.y+invite!.height).toBeLessThanOrEqual(panel!.y+panel!.height);expect(footer!.y).toBeGreaterThan(panel!.y+panel!.height);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBe(1280);
+  await shot(page,testInfo,'expanded-roster');
+});
+
+test('team headers omit player counts and only an empty team owns the remove action',async({page})=>{
+  await page.setViewportSize({width:1280,height:1040});await page.goto('/sequence/');
+  await page.getByRole('button',{name:'Add third team'}).click();
+  await page.locator('.team-panel').nth(0).locator('.player').click({position:{x:260,y:60}});
+  await expect(page.locator('.team-panel').nth(0).locator('.player')).toHaveCount(0);
+  await page.locator('.team-panel').nth(2).getByRole('button',{name:'Add computer'}).click();
+  await expect(page.getByText(/^\d+ PLAYERS?$/)).toHaveCount(0);
+  await expect(page.locator('.team-panel').nth(0).getByRole('button',{name:'Remove team'})).toBeVisible();
+  await expect(page.locator('.team-panel').nth(1).getByRole('button',{name:'Remove team'})).toHaveCount(0);
+  await expect(page.locator('.team-panel').nth(2).getByRole('button',{name:'Remove team'})).toHaveCount(0);
 });
 
 test('the fixed Canvas artboard fits narrow browser panes without horizontal scrolling',async({page})=>{
