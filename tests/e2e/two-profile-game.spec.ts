@@ -73,7 +73,8 @@ test('two isolated Chrome profiles complete a synchronized room journey',async({
     await shot(mover,testInfo,'07-move-committed');await shot(observer,testInfo,'08-move-synchronized');
 
     await host.getByRole('button',{name:'Menu'}).click();await expect(host.getByRole('dialog',{name:'Game menu'})).toBeVisible();
-    await host.getByRole('switch',{name:/Sound/}).click();await expect(host.getByRole('switch',{name:/Sound/}).locator('.switch')).toHaveClass(/on/);
+    await expect(host.getByRole('switch',{name:/Sound/})).toHaveAttribute('aria-checked','true');await expect(host.getByRole('switch',{name:/Sound/}).locator('.switch')).toHaveClass(/on/);
+    await host.getByRole('switch',{name:/Sound/}).click();await expect(host.getByRole('switch',{name:/Sound/})).toHaveAttribute('aria-checked','false');await host.getByRole('switch',{name:/Sound/}).click();await expect(host.getByRole('switch',{name:/Sound/})).toHaveAttribute('aria-checked','true');
     await shot(host,testInfo,'09-menu-overlay');await host.locator('.menu-scrim').click({position:{x:100,y:500}});await expect(host.getByRole('dialog',{name:'Game menu'})).toBeHidden();
     await host.getByRole('button',{name:'Menu'}).click();await host.getByRole('button',{name:'How to play'}).click();
     await expect(host.getByRole('heading',{name:'Make a sequence of five.'})).toBeVisible();await expect(host.getByText('Two-eyed Jacks')).toBeVisible();await host.getByRole('button',{name:'Close'}).click();
@@ -138,7 +139,7 @@ test('growing rosters expand their team cards and push the footer below them',as
   const panel=await red.boundingBox();const invite=await red.getByRole('button',{name:'Invite a friend'}).boundingBox();const footer=await page.locator('.lobby-footer').boundingBox();
   expect(panel).not.toBeNull();expect(invite).not.toBeNull();expect(footer).not.toBeNull();
   expect(panel!.height).toBeGreaterThan(500);expect(invite!.y+invite!.height).toBeLessThanOrEqual(panel!.y+panel!.height);expect(footer!.y).toBeGreaterThan(panel!.y+panel!.height);
-  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBe(1280);
+  expect(await page.evaluate(()=>({width:document.documentElement.scrollWidth,height:document.documentElement.scrollHeight,innerWidth,innerHeight}))).toEqual({width:1280,height:1040,innerWidth:1280,innerHeight:1040});
   await shot(page,testInfo,'expanded-roster');
 });
 
@@ -154,14 +155,20 @@ test('team headers omit player counts and only an empty team owns the remove act
   await expect(page.locator('.team-panel').nth(2).getByRole('button',{name:'Remove team'})).toHaveCount(0);
 });
 
-test('the fixed Canvas artboard fits narrow browser panes without horizontal scrolling',async({page})=>{
+test('the fixed Canvas artboard fits narrow browser panes without scrolling',async({page})=>{
   await page.setViewportSize({width:285,height:800});await page.goto('/sequence/');
   await expect(page.getByRole('heading',{name:'Pick your side'})).toBeVisible();
-  expect(await page.evaluate(()=>({scrollWidth:document.documentElement.scrollWidth,innerWidth,bodyScrollWidth:document.body.scrollWidth}))).toEqual({scrollWidth:285,innerWidth:285,bodyScrollWidth:285});
+  expect(await page.evaluate(()=>({scrollWidth:document.documentElement.scrollWidth,scrollHeight:document.documentElement.scrollHeight,innerWidth,innerHeight,bodyScrollWidth:document.body.scrollWidth}))).toEqual({scrollWidth:285,scrollHeight:800,innerWidth:285,innerHeight:800,bodyScrollWidth:285});
   const stage=await page.locator('.stage').boundingBox();expect(stage?.x).toBeGreaterThanOrEqual(0);expect(stage?.width).toBeCloseTo(285,0);
   await page.getByRole('button',{name:'Add third team'}).click();
   await expect(page.locator('.team-panel').nth(1).locator('.color-control')).toContainText('GREEN');
   await expect(page.getByText('0 PLAYERS')).toHaveCount(0);
+});
+
+test('a short wide viewport scales the whole game to the available height without scrolling',async({page})=>{
+  await page.setViewportSize({width:1280,height:700});await page.goto('/sequence/');await expect(page.getByRole('heading',{name:'Pick your side'})).toBeVisible();
+  const stage=await page.locator('.stage').boundingBox();expect(stage).not.toBeNull();expect(stage!.y).toBeCloseTo(0,0);expect(stage!.height).toBeCloseTo(700,0);expect(stage!.width).toBeLessThanOrEqual(1280);
+  expect(await page.evaluate(()=>({scrollWidth:document.documentElement.scrollWidth,scrollHeight:document.documentElement.scrollHeight,innerWidth,innerHeight}))).toEqual({scrollWidth:1280,scrollHeight:700,innerWidth:1280,innerHeight:700});
 });
 
 test('the Canvas menu overlay remains fully visible in a narrow browser pane',async({page},testInfo)=>{

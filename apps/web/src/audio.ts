@@ -8,12 +8,14 @@ const RECIPES:Record<Cue,Note[]>={
 };
 const KEY='childrex.sequence.preferences.v1';
 class Cues{
-  context:AudioContext|null=null;master:GainNode|null=null;enabled=false;
-  constructor(){try{this.enabled=JSON.parse(localStorage.getItem(KEY)??'{}').soundEnabled===true}catch{this.enabled=false}}
-  async setEnabled(value:boolean){
-    if(!value){this.enabled=false;this.master?.gain.setTargetAtTime(0,this.context?.currentTime??0,.007);this.store();return true}
-    try{this.context??=new AudioContext();if(!this.master){this.master=this.context.createGain();this.master.connect(this.context.destination)}this.master.gain.value=.18;await this.context.resume();this.enabled=this.context.state==='running';this.store();if(this.enabled)this.play('enabled-preview');return this.enabled}catch{this.enabled=false;this.store();return false}
+  context:AudioContext|null=null;master:GainNode|null=null;enabled=false;revision=0;
+  constructor(){try{this.enabled=JSON.parse(localStorage.getItem(KEY)??'{}').soundEnabled!==false}catch{this.enabled=true}}
+  async setEnabled(value:boolean,preview=true){
+    const revision=++this.revision;
+    if(!value){this.enabled=false;this.master?.gain.setTargetAtTime(0,this.context?.currentTime??0,.007);this.store();return false}
+    try{this.context??=new AudioContext();if(!this.master){this.master=this.context.createGain();this.master.connect(this.context.destination)}this.master.gain.value=.18;await this.context.resume();if(revision!==this.revision)return this.enabled;this.enabled=this.context.state==='running';this.store();if(this.enabled&&preview)this.play('enabled-preview');return this.enabled}catch{if(revision!==this.revision)return this.enabled;this.enabled=false;this.store();return false}
   }
+  unlock(){return this.enabled?this.setEnabled(true,false):Promise.resolve(false)}
   store(){try{localStorage.setItem(KEY,JSON.stringify({soundEnabled:this.enabled}))}catch{return}}
   play(cue:Cue){if(!this.enabled||!this.context||!this.master||document.hidden)return;const base=this.context.currentTime+.006;for(const [offset,duration,start,end=start] of RECIPES[cue]){const osc=this.context.createOscillator();const gain=this.context.createGain();const at=base+offset/1000;const stop=at+duration/1000;osc.type='sine';osc.frequency.setValueAtTime(start,at);osc.frequency.linearRampToValueAtTime(end,stop);gain.gain.setValueAtTime(0,at);gain.gain.linearRampToValueAtTime(.35,at+.005);gain.gain.linearRampToValueAtTime(0,stop);osc.connect(gain).connect(this.master);osc.start(at);osc.stop(stop+.005);osc.onended=()=>{osc.disconnect();gain.disconnect()}}}
 }
