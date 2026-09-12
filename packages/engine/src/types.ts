@@ -15,7 +15,7 @@ export interface Seat {
   computer: boolean;
 }
 export interface SequenceRecord { id: string; teamId: string; cells: Cell[]; createdTurn: number }
-export interface LastMove { seatId: string; teamId: string; kind: PlayKind; cell: Cell; cardFace: CardFace; turn: number }
+export interface LastMove { seatId: string; teamId: string; kind: PlayKind; cell: Cell; cardFace: CardFace; turn: number; removedTeamId?: string }
 export interface RoundResult { winnerTeamId: string | null; reason: 'sequences' | 'passes' | 'move-limit' }
 export interface RoundState {
   id: string;

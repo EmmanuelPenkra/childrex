@@ -19,11 +19,16 @@ export class RoomStore {
   constructor(private dataFile?:string){if(dataFile&&existsSync(dataFile)){const saved=JSON.parse(readFileSync(dataFile,'utf8')) as Array<Omit<Room,'receipts'|'createdAt'>&{createdAt?:number;receipts:[string,unknown][]}>;for(const raw of saved){const room={...raw,createdAt:raw.createdAt??Math.min(...raw.members.map(member=>member.joinedAt),Date.now()),members:raw.members.map(member=>({...member,connected:false})),receipts:new Map(raw.receipts)} as Room;this.rooms.set(room.id,room);if(room.phase==='lobby'&&room.code)this.byCode.set(room.code,room.id);for(const member of room.members)this.guestRoom.set(member.guestId,room.id)}}}
   persist(){if(!this.dataFile)return;mkdirSync(path.dirname(this.dataFile),{recursive:true});const temp=`${this.dataFile}.tmp`;const data=[...this.rooms.values()].map(room=>({...room,receipts:[...room.receipts.entries()]}));writeFileSync(temp,JSON.stringify(data),'utf8');renameSync(temp,this.dataFile)}
 
+  private allocateCode(exclude=''){
+    const start=randomInt(99)+1;let code='';
+    for(let n=0;n<99;n++){const candidate=String(((start-1+n)%99)+1).padStart(2,'0');if(candidate!==exclude&&!this.byCode.has(candidate)){code=candidate;break;}}
+    if(!code&&exclude&&!this.byCode.has(exclude))code=exclude;
+    if(!code){const oldest=[...this.byCode.entries()].map(([candidate,roomId])=>({candidate,room:this.rooms.get(roomId)})).filter(item=>item.room?.phase==='lobby').sort((a,b)=>a.room!.createdAt-b.room!.createdAt)[0];if(!oldest?.room)throw new Error('CODES_EXHAUSTED');code=oldest.candidate;this.byCode.delete(code);oldest.room.code='';oldest.room.version++;}
+    return code;
+  }
   create(guestId:string,name:string,avatarId:string): Room {
     const existing=this.roomForGuest(guestId); if(existing)return existing;
-    const id=randomUUID();const start=randomInt(99)+1;let code='';
-    for(let n=0;n<99;n++){const candidate=String(((start-1+n)%99)+1).padStart(2,'0');if(!this.byCode.has(candidate)){code=candidate;break;}}
-    if(!code){const oldest=[...this.byCode.entries()].map(([candidate,roomId])=>({candidate,room:this.rooms.get(roomId)})).filter(item=>item.room?.phase==='lobby').sort((a,b)=>a.room!.createdAt-b.room!.createdAt)[0];if(!oldest?.room)throw new Error('CODES_EXHAUSTED');code=oldest.candidate;this.byCode.delete(code);oldest.room.code='';oldest.room.version++;}
+    const id=randomUUID();const code=this.allocateCode();
     const seatId=randomUUID();
     const teams:Team[]=[{id:'team-blue',color:null,seatIds:[seatId]},{id:'team-red',color:null,seatIds:[]}];
     const seats:Seat[]=[{id:seatId,teamId:'team-blue',name,avatarId,computer:false}];
@@ -54,6 +59,7 @@ export class RoomStore {
   exchange(room:Room,guestId:string,cardId:string){const member=this.member(room,guestId);if(!room.round)throw new Error('NO_ROUND');room.round=applyExchange(room.round,member.seatId,cardId).state;room.version++;return room;}
   pass(room:Room,guestId:string){const member=this.member(room,guestId);if(!room.round)throw new Error('NO_ROUND');room.round=applyPass(room.round,member.seatId).state;room.phase=room.round.result?'finished':'playing';room.version++;return room;}
   replay(room:Room,guestId:string){this.member(room,guestId);if(!room.round?.result)throw new Error('ROUND_NOT_FINISHED');const nextDealer=(room.round.dealerSeatIndex+1)%room.seats.length;const next=createRound(room.teams,room.seats);next.dealerSeatIndex=nextDealer;next.currentSeatIndex=(nextDealer+1)%next.seats.length;room.round=next;room.phase='playing';room.version++;return room;}
+  newGame(room:Room,guestId:string){this.requireHost(room,guestId);this.member(room,guestId);const previousCode=room.code;if(this.byCode.get(previousCode)===room.id)this.byCode.delete(previousCode);room.code=this.allocateCode(previousCode);room.phase='lobby';room.round=null;room.receipts.clear();room.createdAt=Date.now();room.version++;this.byCode.set(room.code,room.id);return room;}
   updateProfile(room:Room,guestId:string,name:string,avatarId:string){const m=this.member(room,guestId);m.name=name;m.avatarId=avatarId;const s=room.seats.find(s=>s.id===m.seatId)!;s.name=name;s.avatarId=avatarId;if(room.round){const rs=room.round.seats.find(x=>x.id===s.id);if(rs){rs.name=name;rs.avatarId=avatarId;}}room.version++;return room;}
   reclaimMember(room:Room,guestId:string){const member=this.member(room,guestId);const seat=room.seats.find(candidate=>candidate.id===member.seatId);if(seat?.computer){seat.computer=false;const roundSeat=room.round?.seats.find(candidate=>candidate.id===seat.id);if(roundSeat)roundSeat.computer=false;room.version++;}return room;}
   computerTurn(room:Room){if(!room.round||room.round.result)return false;const seatId=currentSeatId(room.round);const seat=room.seats.find(candidate=>candidate.id===seatId);if(!seat?.computer)return false;const actions=legalActions(room.round,seat.id);const dead=actions.find(action=>action.dead);if(dead&&!room.round.exchangeUsed)room.round=applyExchange(room.round,seat.id,dead.cardId).state;const move=chooseComputerMove(room.round,seat.id);if(move)room.round=applyPlay(room.round,seat.id,move.cardId,move.cell).state;else room.round=applyPass(room.round,seat.id).state;room.version++;room.phase=room.round.result?'finished':'playing';return true;}

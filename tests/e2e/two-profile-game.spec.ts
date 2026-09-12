@@ -1,5 +1,7 @@
 import { expect, test, type BrowserContext, type Page, type TestInfo } from '@playwright/test';
 
+type TestRoom={phase:'lobby'|'playing'|'finished';yourSeatId:string;round:{turn:number;currentSeatId:string|null;chips:(string|null)[][];lastMove:null|{turn:number;kind:'place'|'remove';removedTeamId?:string}}};
+
 async function shot(page:Page,testInfo:TestInfo,name:string){await page.screenshot({path:testInfo.outputPath(`${name}.png`),animations:'disabled'});}
 async function choosePlayable(page:Page){
   const cards=page.locator('.hand-card:not(:disabled)');
@@ -88,15 +90,15 @@ test('two isolated Chrome profiles complete a synchronized room journey',async({
     await host.evaluate(async id=>{await fetch('/sequence/api/test/fixture',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({roomId:id,kind:'win'})})},roomId);
     await expect(host.getByText(/GAME OVER · .* WINS/)).toBeVisible();await expect(guest.getByText(/GAME OVER · .* WINS/)).toBeVisible();
     await expect(host.locator('.sequence-reveal>i')).toHaveCount(9);await expect(guest.locator('.sequence-reveal>i')).toHaveCount(9);
-    await expect(host.locator('.result-copy>p').last()).toContainText('closed out two sequences');
+    await host.waitForTimeout(300);const resultBar=await host.locator('.result-bar').boundingBox();expect(resultBar).not.toBeNull();expect(resultBar!.y).toBe(928);expect(resultBar!.height).toBe(112);
     await shot(host,testInfo,'11-winner-overlay');await shot(guest,testInfo,'12-result-other-profile');
     await guest.getByRole('button',{name:/Replay/}).click();
     await expect(host.getByText(/GAME OVER · .* WINS/)).toBeHidden();await expect(guest.getByText(/GAME OVER · .* WINS/)).toBeHidden();
     await expect(host.locator('.chip')).toHaveCount(0);await expect(guest.locator('.chip')).toHaveCount(0);
     await shot(host,testInfo,'13-replay-fresh-round');
-    await guest.getByRole('button',{name:'Menu'}).click();await guest.getByRole('button',{name:'Leave game'}).click();
-    await expect(guest.getByRole('heading',{name:'Leave this game?'})).toBeVisible();await guest.getByRole('button',{name:'Leave',exact:true}).click();
-    await expect(guest.getByRole('heading',{name:'You left the game'})).toBeVisible();
+    await host.getByRole('button',{name:'Menu'}).click();await host.getByRole('button',{name:'New game'}).click();await host.getByRole('alertdialog').getByRole('button',{name:'New game'}).click();
+    await expect(host.getByRole('heading',{name:'Pick your side'})).toBeVisible();await expect(guest.getByRole('heading',{name:'Pick your side'})).toBeVisible();
+    await expect(host.locator('.player')).toHaveCount(2);await expect(guest.locator('.player')).toHaveCount(2);await expect(host.locator('.color-control')).toHaveText(['BLUE','RED']);
   }finally{await close(hostProfile);await close(guestProfile)}
 });
 
@@ -109,6 +111,8 @@ test('approved desktop artboard uses the measured Canvas geometry',async({page})
   await expect(page.locator('.team-panel').first()).toHaveCSS('height','500px');
   await expect(page.locator('.code-badge')).toHaveCSS('width','120px');
   await expect(page.locator('.start')).toHaveCSS('height','68px');
+  await expect(page.getByText('Select a color for each team to continue')).toHaveCount(0);
+  await page.locator('.team-panel').nth(0).getByLabel('Select blue').click();await expect(page.locator('.team-panel').nth(0)).toHaveCSS('box-shadow','none');
 });
 
 test('one human move receives exactly one computer reply after a visible pause',async({page})=>{
@@ -173,7 +177,7 @@ test('the Canvas menu overlay remains fully visible in a narrow browser pane',as
   await shot(page,testInfo,'narrow-menu-overlay');
 });
 
-test('three-team lobby assigns the remaining color and can create a fresh room',async({page},testInfo)=>{
+test('three-team lobby assigns the remaining color and preserves its configuration for a new game',async({page},testInfo)=>{
   await page.setViewportSize({width:1280,height:1040});await page.goto('/sequence/');
   const original=(await page.locator('.code-badge strong').innerText()).trim();
   await page.locator('.team-panel').nth(0).getByLabel('Select blue').click();
@@ -188,10 +192,28 @@ test('three-team lobby assigns the remaining color and can create a fresh room',
   await page.getByRole('button',{name:/Start game/}).click();await expect(page.locator('.board-grid')).toBeVisible();await expect(page.locator('.hand-card')).toHaveCount(5);
   const roomId=await page.evaluate(async()=>{const session=await fetch('/sequence/api/session',{method:'POST',headers:{'content-type':'application/json'},body:'{}'}).then(response=>response.json());return session.room.id});
   await page.evaluate(async id=>{await fetch('/sequence/api/test/fixture',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({roomId:id,kind:'win'})})},roomId);
-  await expect(page.locator('.sequence-reveal>i')).toHaveCount(5);await expect(page.locator('.result-score-three')).toBeVisible();await expect(page.locator('.sequence-tag')).toContainText('BLUE · ONE SEQUENCE');await shot(page,testInfo,'three-team-winner-overlay');
+  await expect(page.locator('.sequence-reveal>i')).toHaveCount(5);await expect(page.locator('.result-score-three')).toBeVisible();await expect(page.locator('.sequence-tag')).toContainText('BLUE · ONE SEQUENCE');await expect(page.locator('body>canvas')).toHaveCount(1);await page.screenshot({path:testInfo.outputPath('three-team-confetti-motion.png'),animations:'allow'});await shot(page,testInfo,'three-team-winner-overlay');
   await page.getByRole('button',{name:'New game'}).click();
   const confirm=page.getByRole('alertdialog');await expect(confirm.getByRole('heading',{name:'Start a new game?'})).toBeVisible();await confirm.getByRole('button',{name:'New game'}).click();
   await expect(page.getByRole('heading',{name:'Pick your side'})).toBeVisible();await expect(page.locator('.code-badge strong')).not.toHaveText(original);
+  await expect(page.locator('.team-panel')).toHaveCount(3);await expect(page.locator('.player')).toHaveCount(6);
+  await expect(page.locator('.color-control')).toHaveText(['BLUE','GREEN','RED']);
+});
+
+test('a complete human-versus-computer game preserves every chip except explicit Jack removals',async({page},testInfo)=>{
+  test.setTimeout(150_000);await page.setViewportSize({width:1280,height:1040});await page.goto('/sequence/');
+  await page.locator('.team-panel').nth(0).getByLabel('Select blue').click();await page.locator('.team-panel').nth(1).getByLabel('Select red').click();await page.locator('.team-panel').nth(1).getByRole('button',{name:'Add computer'}).click();await page.getByRole('button',{name:/Start game/}).click();
+  const state=():Promise<TestRoom>=>page.evaluate(async()=>{const session=await fetch('/sequence/api/session',{method:'POST',headers:{'content-type':'application/json'},body:'{}'}).then(response=>response.json());return session.room});
+  const count=(chips:(string|null)[][])=>chips.flat().filter(Boolean).length;
+  const assertTransition=(before:TestRoom,after:TestRoom)=>{const beforeCount=count(before.round.chips),afterCount=count(after.round.chips);const changed=before.round.chips.flatMap((row,r)=>row.flatMap((chip,c)=>chip===after.round.chips[r][c]?[]:[[r,c,chip,after.round.chips[r][c]]]));const move=after.round.lastMove;if(move?.turn===before.round.turn){expect(changed).toHaveLength(1);if(move.kind==='place')expect(afterCount).toBe(beforeCount+1);else{expect(move.removedTeamId).toBeTruthy();expect(afterCount).toBe(beforeCount-1)}}else{expect(afterCount).toBe(beforeCount);expect(changed).toHaveLength(0)}};
+  const takeHumanTurn=async()=>{for(let attempts=0;attempts<16;attempts++){const pass=page.getByRole('button',{name:'Pass'});if(await pass.isVisible().catch(()=>false)){await pass.click();return}const cards=page.locator('.hand-card:not(:disabled)');for(let i=0;i<await cards.count();i++){await cards.nth(i).click();const valid=page.locator('.board-cell.valid');if(await valid.count()){await valid.first().click();return}const replace=page.getByRole('button',{name:'Replace dead card'});if(await replace.isVisible().catch(()=>false)){await replace.click();break}}}throw new Error('Human turn exposed neither a play, exchange, nor pass')};
+  await expect(page.locator('.player.current')).toContainText('You',{timeout:4_000});let removals=0;
+  for(let cycle=0;cycle<55;cycle++){
+    const before=await state();if(before.phase==='finished')break;expect(before.round.currentSeatId).toBe(before.yourSeatId);await takeHumanTurn();await expect.poll(async()=>{const next=await state();return next.phase==='finished'||next.round.currentSeatId!==next.yourSeatId}).toBe(true);const afterHuman=await state();assertTransition(before,afterHuman);expect(await page.locator('.chip').count()).toBe(count(afterHuman.round.chips));if(cycle===0)await shot(page,testInfo,'full-game-human-first-move');if(afterHuman.phase==='finished')break;
+    await page.waitForTimeout(500);const paused=await state();expect(paused.round.turn).toBe(afterHuman.round.turn);
+    await expect.poll(async()=>{const next=await state();return next.phase==='finished'||next.round.currentSeatId===next.yourSeatId},{timeout:2_500}).toBe(true);const afterComputer=await state();assertTransition(afterHuman,afterComputer);expect(await page.locator('.chip').count()).toBe(count(afterComputer.round.chips));if(afterComputer.round.lastMove?.kind==='remove'){removals++;expect(afterComputer.round.lastMove.removedTeamId).toBeTruthy();await expect(page.locator('.board-cell.removed')).toHaveCount(1)}if(cycle===0)await shot(page,testInfo,'full-game-computer-first-reply');if(afterComputer.phase==='finished')break;
+  }
+  const finished=await state();expect(finished.phase).toBe('finished');await expect(page.locator('.result-bar')).toBeVisible();await expect(page.locator('.result-bar')).toHaveCSS('height','112px');expect(await page.locator('.result-bar').evaluate(element=>getComputedStyle(element).animationName)).toBe('result-in');await shot(page,testInfo,`full-game-finished-${removals}-removals`);
 });
 
 test('credits route renders directly with local-asset attribution',async({page})=>{

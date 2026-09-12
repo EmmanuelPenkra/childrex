@@ -97,10 +97,11 @@ export function applyPlay(input: RoundState, seatId: string, cardId: string, cel
   if(!action.cells.some(c=>sameCell(c,cell)))throw new Error('ILLEGAL_TARGET');
   const state=structuredClone(input); const hand=state.hands[seatId]; const index=hand.findIndex(c=>c.id===cardId); const [card]=hand.splice(index,1); state.discards.push(card);
   const teamId=teamOf(state,seatId)!;
+  const removedTeamId=action.kind==='remove'?state.chips[cell.row][cell.col]??undefined:undefined;
   if(action.kind==='place')state.chips[cell.row][cell.col]=teamId; else state.chips[cell.row][cell.col]=null;
   const sequences=action.kind==='place'?findNewSequences(state,teamId,cell):[]; state.sequences.push(...sequences);
   const replacement=draw(state,random); if(replacement)hand.push(replacement);
-  state.lastMove={seatId,teamId,kind:action.kind,cell,cardFace:card.face,turn:state.turn}; state.consecutivePasses=0; state.version++;
+  state.lastMove={seatId,teamId,kind:action.kind,cell,cardFace:card.face,turn:state.turn,...(removedTeamId?{removedTeamId}:{})}; state.consecutivePasses=0; state.version++;
   const score=state.sequences.filter(s=>s.teamId===teamId).length; const target=state.teams.length===2?2:1;
   if(score>=target){state.result={winnerTeamId:teamId,reason:'sequences'};state.currentSeatIndex=null;} else advance(state);
   return {state,events:[{type:action.kind,data:{seatId,cell,face:card.face}},...sequences.map(s=>({type:'sequence',data:{id:s.id,teamId}})),...(state.result?[{type:'finished',data:{winnerTeamId:teamId}}]:[])]};
